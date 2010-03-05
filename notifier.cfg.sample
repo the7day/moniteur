@@ -1,0 +1,54 @@
+[EMAIL]
+; The name of the script to run. Notifier are stored in the "notifier" directory.
+script=mailer.py
+
+; Email server information
+
+; The SMTP server hostname
+server_host=smtp.gmail.com
+
+; The SMTP server port 
+server_port=587
+
+; Do we need to authenticate
+auth_required=True
+
+; Do we need to use TLS
+tls_required=True
+
+; OR do we need to use SSL
+ssl_required=False
+
+; Login for the SMTP server (only required if auth_required=True)
+login=LOGIN
+
+; Password for the SMTP server (only required if auth_required=True)
+password=PASSWORD
+
+; Sender information
+from="Moniteur" <LOGIN@gmail.com>
+
+; Recipient information 
+to="RECIPIENT" <LOGIN@gmail.com>
+
+; Template of the message
+; Allowable code are:
+; 
+; %%(code)s    :  The return code of the test
+; %%(test)s    :  The name of the test
+; %%(date)s    :  The Date and time at which the test was run
+; %%(repeat)s  :  How many time this message was repeated (For when message are aggregated)
+; %%(message)s :  The output of the test  
+
+; Subject of the email 
+subject=Moniteur message (%%(code)s) %%(test)s - %%(date)s
+
+; Body of the email
+body=Moniteur test report
+	Test name:%%(test)s
+	Date:%%(date)s
+	Test return code:%%(code)s
+	Message repeated:%%(repeat)s
+	Message:
+	%%(message)s
+

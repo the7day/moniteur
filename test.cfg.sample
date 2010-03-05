@@ -1,0 +1,110 @@
+; Definition of a "ping" test
+; The name of the test does not matter
+[Test_Ping_10.0.0.10]
+
+; script=<name of python script>
+; Name of the script to execute. Script are located in the "script" directory
+script=ping.py
+
+; arguments=<comma, separated, list>
+; Argument for the script
+arguments=10.0.0.10, 1000
+
+; period=<number of seconds>
+; How often the script should run in seconds
+period=10
+
+; active=True|False
+; Whether this script should run ('True') or not
+active=True
+
+; aggregate=<number> 
+;When the script fails: How many failures do we wait until sending a new notification
+; If the script runs every 10 seconds and you set aggregate to 20
+; you should receive a notification of failure roughly every 200seconds (10x20) instead of
+; a notification every 10 seconds.
+;
+; Please note that when the state of the test changes (from working to failing, or failing to working)
+; the notification are sent right away.
+aggregate=20
+
+; A SIP connection test
+[SIP_localhost_5080]
+
+; Use the python script 'sip.py'
+script=sip.py
+
+; arguments are:
+; sip URI of the SIP server to connect to: sip:127.0.0.1:5080
+;
+; port=<number> : The local port for this SIP UA (set to something non-standard to avoid conflicting with another SIP UA on the same machine)
+;
+; timeout=<number> : Number of seconds after which to timeout if the connection fails
+;
+; log_level=<number> : Log level of the PJSIP library. Default is 3.
+;
+; success_message=<CALLING|EARLY|CONNECTING|CONFIRMED> : PJSIP message that we should consider indicating a successful connection.
+;                  The default value is "CONFIRMED". Value are defined below as:
+;
+; SIP             PJSIP
+; n/a            CALLING        : The call was just initiated
+; 180 Ringing    EARLY          : Received a 180 ringing SIP code from the remote party (with media?)
+; 200 OK         CONNECTING     : Received a 200 OK SIP code from the remote party
+; 200 OK         CONFIRMED      : The RTP stream (audio) has been established
+;
+arguments=sip:127.0.0.1:5080, port=5090, timeout=5
+
+; How often to run the test 
+period=10
+
+; Wait 100 failure after the first one to resend the alert
+aggregate=100
+
+; Active
+active=True
+
+# TEST HTTP
+[CONNECT_10.0.0.11_80]
+; The script to run
+script=connect.py
+
+; The arguments for the connect script:
+; 1/ host to connect to
+; 2/ port to connect to
+;
+; timeout=<number> : (OPTIONAL) Timeout in seconds
+;
+; hello_message=<string> : (OPTIONAL) String to write to the socket after the connection. Could be useful if your server requires some kind of handshake.
+;
+; success_message=<string> : (OPTIONAL) Message we expect to read from the socket to consider the connection a success. If this is not defined, the connection of the socket will considered a success.
+;
+; bye_message=<string> : (OPTIONAL) Message to write to the socket before disconnecting. So we can cleanly disconnect from the server
+;
+; Here we connect to 10.0.0.11 on port 80. If the connection is made the socket is closed and
+; the test is considered successful
+arguments=10.0.0.11, 80
+
+; How often in seconds
+period=10
+
+; Wait 50 failure after the first one to resend the alert
+aggregate=50
+
+; Not active
+active=False
+
+# TEST HTTP v2
+[CONNECT_10.0.0.11_80]
+script=connect.py
+arguments=vocalcom.ae, 80, hello_message=GET / HTTP/1.0\r\n\r\n, success_message=HTTP
+
+; How often in seconds
+period=10
+
+; Wait 50 failure after the first one to resend the alert
+aggregate=50
+
+; Not active
+active=True
+
+

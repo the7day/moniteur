@@ -1,0 +1,52 @@
+#summary Installation Information
+
+= Assumption =
+
+I'll assume you're using windows. If you're using Linux you should be able to follow through and adapt accordingly.
+
+= Requirements =
+
+I haven't really kept track but it shouldn't require much above the standard python distribution.
+
+ * Python 2.6
+ * The pywin32 extension to run Moniteur as a windows service [http://sourceforge.net/projects/pywin32/ sourceforge]. Not needed if you don't want to do that.
+ * PJSIP's python binding if you want to run the SIP test. I don't think the nice folks at http://www.pjsip.org/ distribute a pre-compiled egg so you can the egg available in the repository here or compile it from the source available on pjsip.org yourself.
+
+== Configuration == 
+
+Moniteur has three configuration files.
+
+ * *config.cfg*: The application configuration and the python logging configuration.
+ * *test.cfg*: The configuration of the tests you want to run
+ * *notifier.cfg*: The configuration of the notifiers that should run when a test fails (or succeed after a failure)
+
+=== config.cfg ===
+
+In this file you only need to change the path to the python executable if your setup is different from mine. 
+
+{{{
+[moniteur]
+; This is the path to the python executable that should be used to 
+; run the test and notifiers. It has to be declared here because
+; when running as windows service sys.executable points to the pythonservice.exe.
+; TODO: This parameter needs to die.
+python=C:\Python26\python.exe
+
+; The name file containing the tests configuration
+test_config=tests.cfg
+
+; The name of the file containing the notifier configuration
+notifier_config=notifier.cfg
+
+;Logging configuration
+; Add additional loggers, handlers, formatters here
+; Uses python's logging config file format
+; http=//docs.python.org/lib/logging-config-fileformat.html
+
+[loggers]
+keys = root, moniteur, notifier, service
+
+; Logging configuration removed for brevity
+
+}}}
+

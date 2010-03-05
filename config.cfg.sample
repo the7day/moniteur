@@ -1,0 +1,66 @@
+[moniteur]
+; This is the path to the python executable that should be used to 
+; run the test and notifiers. It has to be declared here because
+; when running as windows service sys.executable points to the pythonservice.exe
+python=C:\Python26\python.exe
+
+; The name file containing the test configuration
+test_config=tests.cfg
+
+; The name of the file containing the notifier configuration
+notifier_config=notifier.cfg
+
+;Logging configuration
+; Add additional loggers, handlers, formatters here
+; Uses python's logging config file format
+; http=//docs.python.org/lib/logging-config-fileformat.html
+
+[loggers]
+keys = root, moniteur, notifier, service
+
+[handlers]
+keys = consoleHandler, fileHandler
+
+[formatters]
+keys = genericFormatter
+
+; If you create additional loggers, add them as a key to [loggers]
+[logger_root]
+level = DEBUG
+handlers = consoleHandler, fileHandler
+
+[logger_moniteur]
+level = INFO
+qualname = moniteur
+handlers = consoleHandler, fileHandler
+propagate = 0
+
+[logger_notifier]
+level = INFO
+qualname = notifier
+handlers = consoleHandler, fileHandler
+propagate = 0
+
+[logger_service]
+level = INFO
+qualname = service
+handlers = consoleHandler, fileHandler
+propagate = 0
+
+# If you create additional handlers, add them as a key to [handlers]
+[handler_consoleHandler]
+class = StreamHandler
+args = (sys.stderr,)
+level = DEBUG
+formatter = genericFormatter
+
+[handler_fileHandler]
+class = logging.handlers.TimedRotatingFileHandler
+args = ("logs/moniteur.log", "midnight", 1)
+level = DEBUG
+formatter = genericFormatter
+
+# If you create additional formatters, add them as a key to [formatters]
+[formatter_genericFormatter]
+format = %(asctime)s,%(msecs)03d %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
