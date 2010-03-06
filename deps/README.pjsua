@@ -1,0 +1,11 @@
+
+
+This is a windows version of PJSUA's python binding for the PJSIP library.
+
+This was compiled on window 7 using Visual Studio 2010 beta. I've seen it working all the way down to XP but of course YMMV.
+
+This software is GPL.
+
+You can download the source from http://www.pjsip.org/
+
+
