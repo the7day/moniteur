@@ -2,8 +2,8 @@
 """
 connect to a host using tcp socket
 returns:
-  0: host ping successfully
-  1: host ping failed
+  0: Test Successful
+  1: Test failed
  -1: Invalid arguments
  -2: An exception occurred
 """

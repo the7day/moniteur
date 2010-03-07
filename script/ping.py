@@ -2,10 +2,10 @@
 """
 Ping a host using windows ping, expects english messages
 returns:
-  0: host ping successfully
-  1: host ping failed
+  0: Test Successful
+  1: Test failed
  -1: Invalid arguments
- -2: An exception occured
+ -2: An exception occurred
 """
 try:
     

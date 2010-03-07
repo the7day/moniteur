@@ -10,6 +10,24 @@ test_config=tests.cfg
 ; The name of the file containing the notifier configuration
 notifier_config=notifier.cfg
 
+; How long to sleep when the notifier fails before 
+; attempting to notify again
+sleep_on_notifier_error = 30
+
+; How many error in the queue are allowed at once
+; if more errors are queued they will be written to the log file and discarded
+max_error_in_queue = 50
+
+; How many time do we try to send the same error notification if it fails
+; -1 == forever
+max_error_notify_attempt = 10000
+
+; Default notifier names
+; List of notifier that will be called for errors if no specific
+; notifier in specified in the test configuration
+default_notifiers = EMAIL, FILE
+
+
 ;Logging configuration
 ; Add additional loggers, handlers, formatters here
 ; Uses python's logging config file format

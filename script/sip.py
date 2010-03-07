@@ -1,9 +1,9 @@
 #
 """
-Ping a host using windows ping, expects english messages
+Make a SIP connection to an host using pjsua
 returns:
-  0: host ping successfully
-  1: host ping failed
+  0: Test Successful
+  1: Test failed
  -1: Invalid arguments
  -2: An exception occurred
  
@@ -17,6 +17,7 @@ Media Active
 
 done = False;
 success = False
+lib = None
 
 try:
     import subprocess
@@ -139,7 +140,6 @@ try:
             call.hangup()
             
         
-
     # We're done, shutdown the library
     lib.destroy()
     lib = None

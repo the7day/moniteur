@@ -7,8 +7,8 @@ A simple monitoring application
 '''
 import sys
 import os
-import time
 import datetime
+import time
 import subprocess
 #import logging
 import string
@@ -26,28 +26,79 @@ class Notifier(threading.Thread):
         self.settings = moniteur_settings
         self._notifiers = notifiers_config
         self._log = logging.getLogger("notifier")
-        self._queue = Queue.Queue(maxsize=100)
+        
+        # Initialize parameters with hopefully sensible default values
+        
+        """ How many time do we try to send the same error notification if it fails -1 == forever """
+        self.max_error_notify_attempt = -1
+        """ How many error in the queue are allowed at once if more errors are queued they will be written to the log file and discarded """
+        self.max_error_in_queue = 200
+        """ How long to sleep when the notifier fails before attempting to notify again """
+        self.sleep_on_notifier_error = 30
+        
+        # Load max_error_in_queue
+        try :
+            self.max_error_in_queue = int(self.settings['max_error_in_queue'])
+            if self.max_error_in_queue < 0:
+                self.max_error_in_queue = 200
+        except:
+            self._log.exception("Invalid setting 'max_error_in_queue'. using %s" % self.max_error_in_queue)
+        
+        # Load max_error_notify_attempt
+        try :
+            self.max_error_notify_attempt = int(self.settings['max_error_notify_attempt'])
+            if self.max_error_notify_attempt < 0:
+                self.max_error_notify_attempt = -1
+        except:
+            self._log.exception("Invalid setting 'max_error_notify_attempt'. using %s" % self.max_error_notify_attempt)
+        
+        # Load sleep_on_notifier_error
+        try :
+            self.sleep_on_notifier_error = int(self.settings['sleep_on_notifier_error'])
+            if self.sleep_on_notifier_error < 0:
+                self.sleep_on_notifier_error = 30
+        except:
+            self._log.exception("Invalid setting 'sleep_on_notifier_error'. using %s" % self.sleep_on_notifier_error)
+        
+        
+        # Initialize the queue
+        self._queue = Queue.Queue(maxsize=self.max_error_in_queue+10)
         # Init thread
         threading.Thread.__init__(self)
     
-    def post_error(self, test_name, error_code, message, repeat_count, notifiers=['EMAIL']):
+    def post_error(self, test_name, error_code, message, repeat_count, notifiers=[]):
+        """ Build an error dict and add it to the queue """
+        item = dict(test=test_name,
+                     code=error_code, 
+                     message=message,
+                     repeat=repeat_count,
+                     notify_error_count=0,
+                     date=datetime.datetime.now(),
+                     utcdate=datetime.datetime.utcnow(),
+                     notifiers=notifiers)
         
+        self._post_error(item)
+        
+            
+    def _post_error(self, item, timeout=None):
+        """ Post an error item dict """
         try:
-            self._log.debug("posting error (%s:%s:%s)" % (test_name, error_code, message))  
-            self._queue.put(dict(
-                                 test=test_name,
-                                 code=error_code, 
-                                 message=message,
-                                 repeat=repeat_count,
-                                 date=datetime.datetime.now(),
-                                 utcdate=datetime.datetime.utcnow(),
-                                 notifiers=notifiers), True, None)
+            self._log.debug("posting error (%s:%s:%s)" % (item['test'], item['code'], item['message']))
+            self._log.info("Queue size:%s", self._queue.qsize())
+            if self._queue.qsize() >= self.max_error_in_queue:
+                self._log.info("Queue is full, unable to post error (%s:%s:%s)" % (item['test'], item['code'], item['message']))
+            else:
+                self._queue.put(item, True, timeout)
 
         except Exception:
             self._log.exception("Exception in post_error()")  
 
     def notify(self, item, notifier_name):
         """ Send a notification for an error item and a specific notifier """
+        
+        # Always assume failure
+        success = False
+        
         try:
             self._log.debug("notify(%s) called" % notifier_name)
             
@@ -71,7 +122,8 @@ class Notifier(threading.Thread):
             if os.access(script, os.R_OK):
                 
                 # Execute the sub-process
-                self._log.info("[Notifier:%s] running (%s)(%s)" % (notifier_name, python, script))
+                self._log.info("[Notifier:%s] running" % (notifier_name, ))
+                self._log.debug("[Notifier:%s] script (%s)(%s)" % (notifier_name, python, script))
                 process = subprocess.Popen(
                     [python, script],
                     shell = False,
@@ -91,15 +143,25 @@ class Notifier(threading.Thread):
                 
                 (stdout, stderr) = process.communicate()
                 
-                print stdout
+                if process.returncode != 0:
+                    """ 
+                    Ooops. The notification script failed.
+                    We are crying in the dark
+                    """
+                    self._log.error("[Notifier:%s] Notification failed with return code %s. stdin:\n%s\n\nstderr:\n%s\n" % (notifier_name, process.returncode, stdout, stderr))
+                else:   
+                    self._log.info("[Notifier:%s] done stdin:\n%s\n\nstderr:\n%s\n" % (notifier_name, stdout, stderr))
+                    success = True
                 
             else:
                 self._log.error("Invalid script file name (%s)" % script)
-                return
+                return False
             
             
         except Exception:
             self._log.exception("Exception in notify()")
+        
+        return success
         
     def run(self):
         """ Main notifier thread method """
@@ -113,19 +175,59 @@ class Notifier(threading.Thread):
                 
                 self._log.debug("Preparing to notify")
                 
-                for k in item['notifiers']:
-                    self.notify(item, k)    
+                # We keep an array of failed notifier
+                failed_notifier = []
                 
-                #print "!!!! ERROR !!!: (%s:%s:%s) " % (item['test'], item['code'], item['message'])
+                # For each notifier, we attempt to notify for this error item
+                for k in item['notifiers']:
+                    
+                    success = self.notify(item, k)
+                    
+                    # if the notification failed we store the name of failed notifier
+                    if not success:
+                        failed_notifier.append(k)
+                
+                # Handle failed notification
+                # Check if all the notifiers have succeeded otherwise requeue the item with the new list of notifier
+                if len(failed_notifier) > 0:
+                    # set the new notifier list
+                    item['notifiers'] = failed_notifier
+                    
+                    # Increase the error count
+                    if 'notify_error_count' not in item:
+                        item['notify_error_count'] = 0
+                    item['notify_error_count'] = item['notify_error_count'] + 1
+                    
+                    self._log.debug("Notification failed %s time for test %s" % (item['notify_error_count'], item['test']))
+                    
+                    # Check if we're above 'max_error_notify_attempt'
+                    if item['notify_error_count'] > self.max_error_notify_attempt:
+                        self._log.warn("Unable to notify after %s attempts. Discarding: (%s:%s:%s)" % (item['notify_error_count'], item['test'], item['code'], item['message']))
+                    else:
+                        self._post_error(item, 1000)
+                        
+                    # Then we sleep 'sleep_on_notifier_error' seconds hoping that the notification script error will fix itself
+                    self.sleep_watch_stop(self.sleep_on_notifier_error)
+                
             except Queue.Empty:
                 pass   
             except Exception:
                 self._log.exception("Exception in run()")
- 
                 
-        
         self._log.info("end of thread")
     
+    def sleep_watch_stop(self, delay):
+        """ Sleep for 'delay' seconds unless  """
+        self._log.info("Sleeping %ss" % delay)
+        
+        deadline = time.time() + delay
+        while not self.stop_required:
+            delay = deadline - time.time()
+            if delay <= 0:
+                break
+            time.sleep(0.5)
+            
+        self._log.info("Waking up")
     
     def stop(self):
         """ Stop the Notifier thread """
@@ -284,7 +386,7 @@ class Moniteur(threading.Thread):
                 for k in process.stdout:
                     stdout_message += k.strip() + "\n"
                     self._log.debug("[Test:%s] output:%s" % (section_name, k.strip()))
-                  
+                
                 # Get the result
                 if process.returncode != 0:
                     """ This is a failure
@@ -319,13 +421,13 @@ class Moniteur(threading.Thread):
                         if run_info['repeat_count'] > 0:
                             self._log.warn("[Test:%s] Flushing previous message: %s" % (section_name, process.returncode))
                             # We are about to report a new message => flush the old message
-                            self._notifier.post_error(section_name, run_info['last_returncode'], run_info['last_message'], run_info['repeat_count'])
+                            self._notifier.post_error(section_name, run_info['last_returncode'], run_info['last_message'], run_info['repeat_count'], self.get_notifier_for_test(section_name))
                             
                         # reset the error count
                         run_info['repeat_count'] = 0
                     
                     if post_error:
-                        self._notifier.post_error(section_name, process.returncode, stdout_message, run_info['repeat_count'])
+                        self._notifier.post_error(section_name, process.returncode, stdout_message, run_info['repeat_count'], self.get_notifier_for_test(section_name))
                     
                 else:
                     # This is a success message
@@ -343,9 +445,7 @@ class Moniteur(threading.Thread):
                     
                     # Check if the last message was an error.  If yes send a "success notification"
                     if run_info['last_returncode'] != 0:
-                        self._notifier.post_error(section_name, process.returncode, stdout_message, 0)
-
-
+                        self._notifier.post_error(section_name, process.returncode, stdout_message, 0, self.get_notifier_for_test(section_name))
                     
                 # Store the information
                 run_info['last_returncode'] = process.returncode
@@ -367,8 +467,23 @@ class Moniteur(threading.Thread):
             self._log.exception("[Test:%s] Exception in run_test()" % (section_name,))
         finally:
             self._log.debug("[Test:%s] completed" % (section_name, ))
+        
                     
-           
+    def get_notifier_for_test(self, test_name):
+        """ Returns a list of notifiers name for a specific test """
+        notifiers = None
+        # Check if the test had a "notifiers" parameter
+        if self.test_config.has_option(test_name, 'notifiers'):
+            notifiers = self.test_config.get(test_name, 'notifiers')
+        # Or use the default notifiers section in the configuration
+        else:
+            notifiers = self.settings['default_notifiers']
+        
+        if notifiers is not None:
+            notifiers = map(string.strip, notifiers.split(","))
+        else:
+            notifiers = []
+        return notifiers
     
     def run(self):
         """ Main monitoring thread method """
